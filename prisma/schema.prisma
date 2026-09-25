@@ -1,0 +1,25 @@
+// Prisma 规范说明：
+// datasource 声明底层数据库为 MySQL，连接串读取环境变量 DATABASE_URL
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// client 生成器：生成供 TypeScript 调用的强类型客户端
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 便签数据模型
+model Note {
+  id        String   @id @default(uuid())
+  title     String   @db.VarChar(255)
+  content   String   @db.Text
+  color     String   @default("yellow") @db.VarChar(32)
+  tags      String   @default("[]") @db.VarChar(512) // 序列化存储标签数组，如 '["Next.js","教程"]'
+  isPinned  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("notes")
+}
