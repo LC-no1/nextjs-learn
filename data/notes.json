@@ -1,0 +1,32 @@
+[
+  {
+    "id": "note-1",
+    "title": "🎉 欢迎使用 Next.js 便签！",
+    "content": "这是一个基于 Next.js App Router 打造的便签应用。\n\n✨ 核心特性：\n1. 无需额外数据库，数据存储在本地 data/notes.json 中\n2. 使用 Next.js Server Actions 极速响应\n3. 支持便签置顶、分类标签、多种便利贴主题色！",
+    "color": "yellow",
+    "tags": ["Next.js", "介绍"],
+    "isPinned": true,
+    "createdAt": "2025-01-01T08:00:00.000Z",
+    "updatedAt": "2025-01-01T08:00:00.000Z"
+  },
+  {
+    "id": "note-2",
+    "title": "💡 学习 Next.js 关键概念",
+    "content": "• Server Component (RSC)：默认在服务器端执行，直接安全读取本地 JSON。\n• Client Component：通过 'use client' 标记，负责点击、输入、弹窗等交互。\n• Server Actions：用 'use server' 定义函数，客户端直接像调本地方法一样调接口！",
+    "color": "blue",
+    "tags": ["学习", "前端"],
+    "isPinned": true,
+    "createdAt": "2025-01-01T09:00:00.000Z",
+    "updatedAt": "2025-01-01T09:00:00.000Z"
+  },
+  {
+    "id": "note-3",
+    "title": "🛒 周末待办清单",
+    "content": "1. 购买咖啡豆 ☕\n2. 整理工作台桌面 🖥️\n3. 复习 React 19 新特性",
+    "color": "green",
+    "tags": ["生活", "待办"],
+    "isPinned": false,
+    "createdAt": "2025-01-02T10:00:00.000Z",
+    "updatedAt": "2025-01-02T10:00:00.000Z"
+  }
+]

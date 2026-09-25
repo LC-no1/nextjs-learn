@@ -1,69 +1,40 @@
-import Image from "next/image";
+import { getAllNotes } from '@/lib/notes';
+import NotesContainer from '@/components/NotesContainer';
 
-export default function Home() {
+/**
+ * Next.js 规则说明：
+ * 1. 本文件未添加 'use client'，因此它是一个默认的【服务端组件（Server Component）】。
+ * 2. 服务端组件支持 async/await：我们可以在渲染该组件时直接从磁盘读取 data/notes.json，
+ *    这意味着在 HTML 传输到浏览器之前，便签数据就已经准备好并直接渲染成 HTML，
+ *    完全没有传统 SPA 应用客户端加载时的“白屏闪烁”或 loading 动画。
+ * 3. export const dynamic = 'force-dynamic' 强制动态渲染，保证每次刷新页面都能获取 JSON 最新的实时数据。
+ */
+export const dynamic = 'force-dynamic';
+
+export default async function HomePage() {
+  // 直接在服务端调用底层文件读取方法
+  const notes = await getAllNotes();
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="space-y-6">
+      {/* 教学与提示面板 */}
+      <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-yellow-500/10 border border-amber-200/60 rounded-2xl p-5 shadow-2xs">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-base font-bold text-neutral-800 flex items-center gap-2">
+              <span>💡</span> Next.js 便签实战应用
+            </h2>
+            <p className="text-xs text-neutral-600 mt-1 leading-relaxed">
+              本页面由 Next.js <span className="font-semibold text-amber-700">Server Component</span> 服务端直出渲染，
+              新增、编辑、置顶便签均通过 <span className="font-semibold text-amber-700">Server Actions</span> 完成，
+              数据持久化保存在本地 <code className="bg-amber-100/80 px-1 py-0.5 rounded text-amber-900 font-mono">data/notes.json</code> 中。
+            </p>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </div>
+
+      {/* 客户端交互组件：便签列表、筛选与弹窗 */}
+      <NotesContainer initialNotes={notes} />
     </div>
   );
 }
