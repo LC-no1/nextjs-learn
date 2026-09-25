@@ -1,175 +1,200 @@
-import { prisma } from './prisma';
+import { supabase } from './supabase';
 import { Note, CreateNoteInput, UpdateNoteInput, NoteColor } from '@/types/note';
 import fs from 'fs/promises';
 import path from 'path';
 
 /**
- * 格式化数据库返回的 Prisma Note 对象为统一前端 Note 规范
+ * 将 Supabase 数据库行记录安全映射为前端 Note 类型
  */
-function formatNote(raw: {
+interface SupabaseNoteRow {
   id: string;
   title: string;
   content: string;
   color: string;
-  tags: string;
+  tags: string[] | string | null;
   isPinned: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}): Note {
+  createdAt: string;
+  updatedAt: string;
+}
+
+function formatNote(row: SupabaseNoteRow): Note {
   let parsedTags: string[] = [];
-  try {
-    parsedTags = JSON.parse(raw.tags);
-    if (!Array.isArray(parsedTags)) parsedTags = [];
-  } catch {
-    parsedTags = [];
+  if (Array.isArray(row.tags)) {
+    parsedTags = row.tags;
+  } else if (typeof row.tags === 'string') {
+    try {
+      parsedTags = JSON.parse(row.tags);
+    } catch {
+      parsedTags = [];
+    }
   }
 
   return {
-    id: raw.id,
-    title: raw.title,
-    content: raw.content,
-    color: (raw.color as NoteColor) || 'yellow',
-    tags: parsedTags,
-    isPinned: Boolean(raw.isPinned),
-    createdAt: raw.createdAt.toISOString(),
-    updatedAt: raw.updatedAt.toISOString(),
+    id: row.id,
+    title: row.title || '',
+    content: row.content || '',
+    color: (row.color as NoteColor) || 'yellow',
+    tags: Array.isArray(parsedTags) ? parsedTags : [],
+    isPinned: Boolean(row.isPinned),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
 
 /**
- * 自动迁移旧 JSON 数据（平滑升级）：
- * 如果 MySQL 数据库是空的，自动读取原 data/notes.json 并导入 MySQL
+ * 自动迁移旧 JSON 数据至云端 Supabase（平滑升级）：
+ * 当云端数据库为空时，自动将本地 data/notes.json 中的历史便签同步至云端
  */
 async function autoMigrateFromJsonIfEmpty(): Promise<void> {
   try {
-    const count = await prisma.note.count();
-    if (count > 0) return;
+    const { count, error } = await supabase
+      .from('notes')
+      .select('*', { count: 'exact', head: true });
+
+    if (error || (count !== null && count > 0)) {
+      return;
+    }
 
     const jsonPath = path.join(process.cwd(), 'data', 'notes.json');
     const raw = await fs.readFile(jsonPath, 'utf-8');
     const oldNotes = JSON.parse(raw) as Note[];
 
     if (Array.isArray(oldNotes) && oldNotes.length > 0) {
-      for (const item of oldNotes) {
-        await prisma.note.create({
-          data: {
-            id: item.id,
-            title: item.title,
-            content: item.content,
-            color: item.color || 'yellow',
-            tags: JSON.stringify(item.tags || []),
-            isPinned: Boolean(item.isPinned),
-            createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
-            updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
-          },
-        });
-      }
-      console.log('✅ 已成功将 data/notes.json 历史数据平滑导入至本地 MySQL 数据库！');
+      const rowsToInsert = oldNotes.map((n) => ({
+        id: n.id,
+        title: n.title,
+        content: n.content,
+        color: n.color || 'yellow',
+        tags: n.tags || [],
+        isPinned: Boolean(n.isPinned),
+        createdAt: n.createdAt || new Date().toISOString(),
+        updatedAt: n.updatedAt || new Date().toISOString(),
+      }));
+
+      await supabase.from('notes').insert(rowsToInsert);
+      console.log('✅ 已成功将历史便签数据平滑迁移至云端 Supabase！');
     }
   } catch {
-    // 忽略平滑迁移的轻微读取错误
+    // 忽略迁移失败（如无文件或权限受限）
   }
 }
 
 /**
  * 获取所有便签：
- * 业务排序规则：置顶 (isPinned) 优先展示，其次按照 updatedAt 倒序
+ * 业务排序规则：置顶 (isPinned) 的便签优先展示，其次按照 updatedAt 倒序
  */
 export async function getAllNotes(): Promise<Note[]> {
   await autoMigrateFromJsonIfEmpty();
 
-  const notes = await prisma.note.findMany({
-    orderBy: [
-      { isPinned: 'desc' },
-      { updatedAt: 'desc' },
-    ],
-  });
+  const { data, error } = await supabase
+    .from('notes')
+    .select('*')
+    .order('isPinned', { ascending: false })
+    .order('updatedAt', { ascending: false });
 
-  return notes.map(formatNote);
+  if (error) {
+    console.error('Supabase getAllNotes error:', error);
+    return [];
+  }
+
+  return (data as SupabaseNoteRow[]).map(formatNote);
 }
 
 /**
  * 根据 ID 获取单张便签
  */
 export async function getNoteById(id: string): Promise<Note | null> {
-  const note = await prisma.note.findUnique({
-    where: { id },
-  });
-  return note ? formatNote(note) : null;
+  const { data, error } = await supabase
+    .from('notes')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error || !data) return null;
+  return formatNote(data as SupabaseNoteRow);
 }
 
 /**
  * 创建新便签
  */
 export async function createNote(input: CreateNoteInput): Promise<Note> {
-  const created = await prisma.note.create({
-    data: {
-      title: input.title.trim(),
-      content: input.content.trim(),
-      color: input.color || 'yellow',
-      tags: JSON.stringify(input.tags || []),
-      isPinned: Boolean(input.isPinned),
-    },
-  });
+  const now = new Date().toISOString();
+  const row = {
+    title: input.title.trim(),
+    content: input.content.trim(),
+    color: input.color || 'yellow',
+    tags: input.tags || [],
+    isPinned: Boolean(input.isPinned),
+    createdAt: now,
+    updatedAt: now,
+  };
 
-  return formatNote(created);
+  const { data, error } = await supabase
+    .from('notes')
+    .insert([row])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Supabase createNote error:', error);
+    throw new Error(error.message);
+  }
+
+  return formatNote(data as SupabaseNoteRow);
 }
 
 /**
  * 更新指定便签
  */
 export async function updateNote(id: string, input: UpdateNoteInput): Promise<Note | null> {
-  try {
-    const updateData: Record<string, unknown> = {};
+  const updateData: Record<string, unknown> = {
+    updatedAt: new Date().toISOString(),
+  };
 
-    if (input.title !== undefined) updateData.title = input.title.trim();
-    if (input.content !== undefined) updateData.content = input.content.trim();
-    if (input.color !== undefined) updateData.color = input.color;
-    if (input.tags !== undefined) updateData.tags = JSON.stringify(input.tags);
-    if (input.isPinned !== undefined) updateData.isPinned = input.isPinned;
+  if (input.title !== undefined) updateData.title = input.title.trim();
+  if (input.content !== undefined) updateData.content = input.content.trim();
+  if (input.color !== undefined) updateData.color = input.color;
+  if (input.tags !== undefined) updateData.tags = input.tags;
+  if (input.isPinned !== undefined) updateData.isPinned = input.isPinned;
 
-    const updated = await prisma.note.update({
-      where: { id },
-      data: updateData,
-    });
+  const { data, error } = await supabase
+    .from('notes')
+    .update(updateData)
+    .eq('id', id)
+    .select()
+    .single();
 
-    return formatNote(updated);
-  } catch (error) {
-    console.error('Error updating note in MySQL:', error);
+  if (error || !data) {
+    console.error('Supabase updateNote error:', error);
     return null;
   }
+
+  return formatNote(data as SupabaseNoteRow);
 }
 
 /**
  * 删除指定便签
  */
 export async function deleteNote(id: string): Promise<boolean> {
-  try {
-    await prisma.note.delete({
-      where: { id },
-    });
-    return true;
-  } catch (error) {
-    console.error('Error deleting note from MySQL:', error);
+  const { error } = await supabase
+    .from('notes')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Supabase deleteNote error:', error);
     return false;
   }
+
+  return true;
 }
 
 /**
  * 切换便签置顶状态
  */
 export async function togglePinNote(id: string): Promise<Note | null> {
-  const current = await prisma.note.findUnique({
-    where: { id },
-    select: { isPinned: true },
-  });
-
+  const current = await getNoteById(id);
   if (!current) return null;
 
-  const updated = await prisma.note.update({
-    where: { id },
-    data: { isPinned: !current.isPinned },
-  });
-
-  return formatNote(updated);
+  return updateNote(id, { isPinned: !current.isPinned });
 }

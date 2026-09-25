@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'Next.js 极简便签本',
-  description: '基于 Next.js App Router 与本地 MySQL (Prisma) 的便签 Web 应用',
+  description: '基于 Next.js App Router 与云端 Supabase 的便签 Web 应用',
 };
 
 export default function RootLayout({
@@ -34,7 +34,7 @@ export default function RootLayout({
                 <h1 className="text-lg font-bold text-neutral-900 leading-tight">
                   StickyNotes <span className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full ml-1">Next.js App</span>
                 </h1>
-                <p className="text-[11px] text-neutral-500">本地 MySQL · Prisma ORM · Server Actions 驱动</p>
+                <p className="text-[11px] text-neutral-500">云端 Supabase · PostgreSQL · Server Actions 驱动</p>
               </div>
             </div>
 
